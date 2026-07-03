@@ -26,6 +26,34 @@ Security), then restart the daemon:
 - **Input Monitoring** — prompted automatically for the global hotkey
 - **Accessibility** — add manually if text never appears (needed for the synthetic ⌘V)
 
+## Run at login (launchd)
+
+`com.nino.local-dictation.plist` is included but NOT loaded automatically —
+loading it starts a background daemon with mic + Input Monitoring access, so
+that's an explicit opt-in:
+
+```sh
+cp com.nino.local-dictation.plist ~/Library/LaunchAgents/
+launchctl bootstrap gui/$UID ~/Library/LaunchAgents/com.nino.local-dictation.plist
+```
+
+Stop / remove:
+
+```sh
+launchctl bootout gui/$UID/com.nino.local-dictation
+rm ~/Library/LaunchAgents/com.nino.local-dictation.plist
+```
+
+Status and logs: `launchctl print gui/$UID/com.nino.local-dictation` and
+`~/Library/Logs/local-dictation.log`.
+
+Permissions caveat: under launchd there is no hosting terminal, so macOS
+attributes the TCC prompts to the `.venv` python binary itself — expect fresh
+Microphone / Input Monitoring / Accessibility prompts on first launchd run
+even if your terminal already has grants. The plist restarts the daemon on
+crash (`KeepAlive.SuccessfulExit=false`); Ollama being down is fine — the
+daemon inserts raw transcripts until it returns.
+
 ## Options
 
 ```
