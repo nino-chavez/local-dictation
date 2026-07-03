@@ -83,6 +83,23 @@ layer plus mid-stream correction handling. Not worth it at local-GPU speed.
   the worker timeout." Correct behavior on both legs.
 - Warm latencies: 0.77 s transcribe (11 s clip), 0.6 s cleanup.
 
+## Added after the core loop shipped
+
+- Prompt-injection hardening on the cleanup pass: the transcript is wrapped in
+  `<transcript>` tags and the system prompt forbids answering/obeying it —
+  without this, question-shaped dictation ("what am I saying right now?") got
+  answered by llama3.1 instead of cleaned.
+- `menubar.py` — rumps tray app (◉/○, Start/Stop/Open Log/Quit) as a control
+  plane over the launchd job, plus a second launchd agent so the tray itself
+  survives login. The tray drives `launchctl`; it never owns the daemon
+  process, so it needs no TCC permissions.
+- Note routing: utterances starting with "take a note" / "note to self" go to
+  macOS Notes via AppleScript instead of the paste path. Background capture,
+  not app launch — the stated goal was staying in the current app, and
+  `osascript` creates the note without stealing focus. Matching runs on the
+  raw transcript (cleanup may reword the trigger); the remainder still gets
+  the cleanup pass.
+
 ## Non-goals
 
 Streaming transcription, menu-bar/settings UI, packaging/notarization,

@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.nino.local-dictation.menubar</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/nino/Workspace/dev/wip/local-dictation/.venv/bin/python</string>
+    <string>/Users/nino/Workspace/dev/wip/local-dictation/menubar.py</string>
+  </array>
+
+  <key>WorkingDirectory</key>
+  <string>/Users/nino/Workspace/dev/wip/local-dictation</string>
+
+  <key>RunAtLoad</key>
+  <true/>
+
+  <key>KeepAlive</key>
+  <dict>
+    <key>SuccessfulExit</key>
+    <false/>
+  </dict>
+
+  <key>StandardOutPath</key>
+  <string>/Users/nino/Library/Logs/local-dictation-menubar.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/nino/Library/Logs/local-dictation-menubar.log</string>
+</dict>
+</plist>

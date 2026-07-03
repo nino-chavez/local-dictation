@@ -17,6 +17,11 @@ cd ~/Workspace/dev/wip/local-dictation
 Wait for `ready — tap alt_r to dictate`, then in any app: tap **right Option**,
 speak, tap again or just pause. You'll hear a Tink on start, a Pop on stop.
 
+Start the utterance with **"take a note"** or **"note to self"** and the
+dictation is captured as a new note in macOS Notes (created in the background —
+focus never leaves your current app; Glass sound on success) instead of being
+pasted inline.
+
 ## First-run permissions
 
 Grant these to the terminal app you run it from (System Settings → Privacy &
@@ -26,26 +31,28 @@ Security), then restart the daemon:
 - **Input Monitoring** — prompted automatically for the global hotkey
 - **Accessibility** — add manually if text never appears (needed for the synthetic ⌘V)
 
-## Run at login (launchd)
+## Run at login (launchd) + menu-bar control
 
-`com.nino.local-dictation.plist` is included but NOT loaded automatically —
-loading it starts a background daemon with mic + Input Monitoring access, so
-that's an explicit opt-in:
+Two launchd agents, installed by copying both plists to `~/Library/LaunchAgents/`
+and `launchctl bootstrap gui/$UID <plist>` each (opt-in — the daemon has mic +
+Input Monitoring access):
+
+- `com.nino.local-dictation.plist` — the dictation daemon (`dictate.py`)
+- `com.nino.local-dictation.menubar.plist` — the tray app (`menubar.py`): a
+  ◉/○ menu-bar icon with Start / Stop / Open Log / Quit. It doesn't run the
+  daemon itself; it drives the daemon's launchd job via `launchctl`, so
+  launchd stays the single owner (crash-restart, logging) and the tray needs
+  no permissions of its own. Quit keeps it quit until next login.
+
+Manual control (same thing the tray does):
 
 ```sh
-cp com.nino.local-dictation.plist ~/Library/LaunchAgents/
-launchctl bootstrap gui/$UID ~/Library/LaunchAgents/com.nino.local-dictation.plist
+launchctl bootout gui/$UID/com.nino.local-dictation      # stop
+launchctl bootstrap gui/$UID ~/Library/LaunchAgents/com.nino.local-dictation.plist  # start
 ```
 
-Stop / remove:
-
-```sh
-launchctl bootout gui/$UID/com.nino.local-dictation
-rm ~/Library/LaunchAgents/com.nino.local-dictation.plist
-```
-
-Status and logs: `launchctl print gui/$UID/com.nino.local-dictation` and
-`~/Library/Logs/local-dictation.log`.
+Status and logs: `launchctl print gui/$UID/com.nino.local-dictation`,
+`~/Library/Logs/local-dictation.log` (daemon), `local-dictation-menubar.log` (tray).
 
 Permissions caveat: under launchd there is no hosting terminal, so macOS
 attributes the TCC prompts to the `.venv` python binary itself — expect fresh
