@@ -1,0 +1,379 @@
+# Generate Developer Documentation
+
+Description: Creates comprehensive developer onboarding documentation including setup guides, contribution guidelines, and environment configuration using a three-phase refinement pipeline.
+
+Arguments:
+- focus: (optional) Specific aspect to document: "setup", "contributing", "environment". Defaults to all.
+
+---
+
+You are executing a three-phase documentation pipeline. Read CLAUDE.md first for project context, then read `docs/voice/developer-voice.md` for voice requirements.
+
+---
+
+## PHASE 1: GENERATOR (Draft)
+
+*Persona: Developer Experience Engineer creating initial draft*
+
+### Step 1: Prerequisites Detection
+
+Scan for version requirements:
+
+| File | Extract |
+|------|---------|
+| `package.json` | `engines.node`, `engines.npm` |
+| `.nvmrc` / `.node-version` | Node version |
+| `.python-version` / `pyproject.toml` | Python version |
+| `go.mod` | Go version |
+| `.tool-versions` | All tool versions (asdf) |
+| `rust-toolchain.toml` | Rust version |
+| `Dockerfile` | Base image versions |
+| `docker-compose.yml` | Required services |
+
+### Step 2: Installation Steps
+
+Identify install commands from:
+- `package.json` scripts (`install`, `setup`, `bootstrap`)
+- `Makefile` targets (`install`, `setup`, `deps`)
+- `setup.sh` / `bootstrap.sh` scripts
+- `README.md` existing instructions
+- `Dockerfile` build steps
+
+### Step 3: Environment Configuration
+
+Analyze:
+- `.env.example` / `.env.sample` / `.env.template`
+- `config/` directory
+- Environment variable references in code
+- Docker compose environment sections
+- Secret references in CI/CD configs
+
+### Step 4: Development Workflow
+
+Identify from scripts/Makefile:
+- Dev server command
+- Build command
+- Test commands (unit, integration, e2e)
+- Lint/format commands
+- Database migration commands
+- Code generation commands
+
+### Draft Output
+
+Generate initial documentation with:
+- Quick Start (under 10 minutes)
+- Prerequisites with versions
+- Environment setup steps
+- Development workflow commands
+- Project structure overview
+- Troubleshooting section
+
+---
+
+## PHASE 2: REFINER (Polish)
+
+*Persona: Technical Editor improving usability*
+
+### Clarity Pass
+
+- [ ] Every command has context (what it does, expected output)
+- [ ] Prerequisites include installation links
+- [ ] Steps are numbered, not bulleted
+- [ ] No assumed knowledge without documentation link
+
+### Completeness Pass
+
+- [ ] All environment variables from .env.example documented
+- [ ] All npm scripts / Makefile targets included
+- [ ] IDE setup recommendations present
+- [ ] Troubleshooting covers common errors
+
+### User Experience Pass
+
+- [ ] Quick Start is actually quick (under 10 minutes)
+- [ ] Commands are copy-paste ready (no placeholders unless noted)
+- [ ] Success criteria stated after each major step
+- [ ] "Getting help" section exists
+
+### Enhancement
+
+For each section, ask:
+- Can a new developer follow this on day 1?
+- Would they know if something went wrong?
+- Can they get unstuck without asking someone?
+
+Revise the draft to address any gaps.
+
+---
+
+## PHASE 3: VALIDATOR (QA)
+
+*Persona: Quality Assurance reviewing against voice standards*
+
+### Voice Compliance (from docs/voice/developer-voice.md)
+
+Verify:
+- [ ] Imperative mood for all instructions ("Run", "Install", "Configure")
+- [ ] No passive voice in procedures
+- [ ] No unexplained jargon
+- [ ] Encouraging but not condescending tone
+- [ ] "you" addressing the reader directly
+
+### Anti-Pattern Check
+
+Reject if any of these appear:
+
+| Anti-Pattern | Example | Fix |
+|--------------|---------|-----|
+| Wall of text before action | 3+ paragraphs before first command | Lead with Quick Start |
+| Assumed knowledge | "Configure your SSH keys and pull" | Provide link or inline instructions |
+| Passive voice | "The config file should be created" | "Create the config file" |
+| Commands without context | Just a code block | Add what it does and expected output |
+| "Simply" or "just" | "Simply run the install" | Remove minimizing language |
+
+### Red Flag Check
+
+If ANY of these are present, return to Phase 2:
+
+- [ ] More than 3 paragraphs before the first actionable step
+- [ ] "Simply" or "just" before a complex operation
+- [ ] Commands that require modification without noting it
+- [ ] References to "the usual way" or "as you know"
+- [ ] Undeclared prerequisites discovered mid-procedure
+- [ ] Steps that only work on one OS without noting it
+
+### Final Checklist
+
+- [ ] `docs/developer/README.md` - Complete developer guide
+- [ ] `docs/developer/contributing.md` - Contribution guidelines
+- [ ] `docs/developer/setup.md` - Detailed setup instructions
+- [ ] Quick Start works in under 10 minutes
+- [ ] All commands verified against package.json/Makefile
+- [ ] Environment variables documented with purposes
+- [ ] Troubleshooting section populated
+- [ ] Voice compliance verified (no red flags)
+
+---
+
+## Output Templates
+
+### docs/developer/README.md
+
+```markdown
+# Developer Guide
+
+> Auto-generated by Autonomous Knowledge Synthesis
+> Last updated: [date]
+
+## Quick Start
+
+Get the project running in under 10 minutes.
+
+```bash
+# Clone and enter
+git clone [repo-url]
+cd [project-name]
+
+# Install dependencies
+[detected install command]
+
+# Configure environment
+cp .env.example .env
+# Edit .env with your values (see Environment Variables below)
+
+# Start development
+[detected dev command]
+
+# Verify setup
+[detected test or health check command]
+```
+
+**Success:** You should see [expected output]. If not, see [Troubleshooting](#troubleshooting).
+
+## Prerequisites
+
+### Required Software
+
+| Tool | Version | Installation |
+|------|---------|--------------|
+| [Tool] | [Version] | `brew install [tool]` or [download link] |
+
+### Required Services
+
+[If Docker services needed]
+```bash
+docker compose up -d [service-names]
+```
+
+| Service | Purpose | Local Port |
+|---------|---------|------------|
+| PostgreSQL | Primary database | 5432 |
+
+## Environment Setup
+
+### Step 1: Install Dependencies
+
+```bash
+[detected command]
+```
+
+**Success:** No errors in output.
+
+### Step 2: Configure Environment
+
+1. Copy the example environment file:
+   ```bash
+   cp .env.example .env
+   ```
+
+2. Edit `.env` with your values:
+
+#### Required Variables
+
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `DATABASE_URL` | Database connection string | `postgresql://user:pass@localhost:5432/db` |
+
+#### Optional Variables
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `LOG_LEVEL` | Logging verbosity | `info` |
+
+### Step 3: Database Setup
+
+```bash
+# Run migrations
+[detected migration command]
+
+# Seed data (optional)
+[detected seed command]
+```
+
+**Success:** "Migrations complete" or similar message.
+
+### Step 4: Verify Installation
+
+```bash
+[detected test command]
+```
+
+**Success:** All tests pass (green output).
+
+## Development Workflow
+
+### Running the Dev Server
+
+```bash
+[dev command]
+```
+
+Available at:
+- **Web:** http://localhost:[port]
+- **API:** http://localhost:[port]/api
+
+### Common Tasks
+
+| Task | Command |
+|------|---------|
+| Run all tests | `[test command]` |
+| Run linter | `[lint command]` |
+| Format code | `[format command]` |
+| Build | `[build command]` |
+
+## Project Structure
+
+```
+[project-name]/
+├── src/           # Source code
+├── tests/         # Test files
+├── docs/          # Documentation
+└── scripts/       # Build/deploy scripts
+```
+
+## IDE Setup
+
+### VS Code (Recommended)
+
+Install recommended extensions:
+```bash
+code --install-extension [extension-id]
+```
+
+## Troubleshooting
+
+### Command Not Found
+
+**Symptom:** `command not found` error
+**Solution:** Ensure prerequisites are installed and in PATH
+
+### Port Already in Use
+
+**Symptom:** `EADDRINUSE` error
+**Solution:** `kill -9 $(lsof -t -i:PORT)` or use different port
+
+### Getting Help
+
+- Check [GitHub Issues]([repo]/issues)
+- Ask in [team channel]
+- Review [Architecture docs](../architecture/README.md)
+
+---
+
+## Next Steps
+
+- Read the [Architecture Overview](../architecture/README.md)
+- Review [Contributing Guidelines](./contributing.md)
+```
+
+### docs/developer/contributing.md
+
+```markdown
+# Contributing Guidelines
+
+## Code Style
+
+[Detect from linter configs]
+
+### Formatting
+```bash
+# Check formatting
+[lint command]
+
+# Auto-fix
+[format command]
+```
+
+## Git Workflow
+
+### Branch Naming
+- `feature/[ticket-id]-description`
+- `fix/[ticket-id]-description`
+- `chore/description`
+
+### Commit Messages
+
+Use [Conventional Commits](https://conventionalcommits.org):
+```
+type(scope): description
+
+[optional body]
+```
+
+Types: `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`
+
+### Pull Request Process
+
+1. Create feature branch from `main`
+2. Make changes with tests
+3. Run `[test command]` locally
+4. Push and create PR
+5. Address review feedback
+6. Squash and merge
+
+## Testing Requirements
+
+- All new features require tests
+- Maintain or improve code coverage
+- Run `[test command]` before pushing
+```

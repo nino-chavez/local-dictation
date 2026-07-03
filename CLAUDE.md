@@ -78,3 +78,11 @@ launchd agents (`com.nino.local-dictation[.menubar].plist` in
 - Whisper model: `mlx-community/whisper-large-v3-turbo` (~1.6 GB, cached in
   `~/.cache/huggingface`). Ollama cleanup model: `llama3.1`, kept warm via
   `keep_alive: 60m`.
+
+## Documentation
+
+`docs/architecture/README.md` holds the structural view (pipeline, threading,
+deployment diagrams); PLAN.md holds decisions and rationale; README.md is the
+user doc. Documentation skills from the Claude Docs Toolkit are installed in
+`.claude/commands/` (`/doc-architecture`, `/doc-audit`, etc.) — apply them
+adaptively; a repo this size does not need the full docs/ tree.
