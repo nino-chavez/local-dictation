@@ -1,0 +1,53 @@
+# local-dictation
+
+Fully local Wispr Flow clone for macOS (Apple Silicon). Tap a hotkey, speak,
+tap again (or pause ~2 s) — cleaned-up text is pasted into whatever field has
+focus. Whisper (MLX, on-GPU) transcribes; Ollama removes filler words and fixes
+punctuation. The only network traffic is `localhost:11434`.
+
+See `PLAN.md` for architecture and decisions.
+
+## Run
+
+```sh
+cd ~/Workspace/dev/wip/local-dictation
+.venv/bin/python dictate.py
+```
+
+Wait for `ready — tap alt_r to dictate`, then in any app: tap **right Option**,
+speak, tap again or just pause. You'll hear a Tink on start, a Pop on stop.
+
+## First-run permissions
+
+Grant these to the terminal app you run it from (System Settings → Privacy &
+Security), then restart the daemon:
+
+- **Microphone** — prompted automatically on first recording
+- **Input Monitoring** — prompted automatically for the global hotkey
+- **Accessibility** — add manually if text never appears (needed for the synthetic ⌘V)
+
+## Options
+
+```
+--key alt_r          toggle key (any pynput name: cmd_r, f13, ...)
+--model llama3.1     Ollama model for the cleanup pass
+--no-cleanup         insert the raw transcript, skip Ollama
+--no-auto-stop       only the hotkey stops recording
+--silence-secs 2.0   trailing silence before auto-stop
+--language en        spoken language
+--test-file f.wav    pipeline check without mic/hotkey (prints instead of pastes)
+```
+
+## Notes
+
+- First use of a new `--whisper` model downloads weights from Hugging Face;
+  after that the daemon sets `HF_HUB_OFFLINE=1` and runs fully offline.
+- Text insertion goes through the clipboard (paste is reliable where synthetic
+  typing is not). Your previous clipboard **text** is restored afterwards;
+  non-text clipboard content (images) is not.
+- If Ollama is down the raw transcript is inserted instead — dictation never
+  hard-fails on the cleanup leg.
+- If tapping right Option does nothing even after granting Input Monitoring
+  (some keyboards remap it), pick another key: `--key f13` or `--key cmd_r`.
+- Setup from scratch: `uv venv --python 3.13 .venv && uv pip install --python
+  .venv/bin/python mlx-whisper sounddevice pynput` (ffmpeg via Homebrew).

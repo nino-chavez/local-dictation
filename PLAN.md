@@ -1,0 +1,89 @@
+# local-dictation — fully local Wispr Flow clone for macOS
+
+## What Wispr Flow does (the loop we're cloning)
+
+Wispr Flow: hold/tap a global hotkey (fn by default, push-to-talk; toggle mode
+available) → mic capture → streaming ASR in the cloud → LLM cleanup pass
+(filler removal, punctuation, context-aware formatting) → text inserted into
+whatever field has focus via keyboard events. The product's value is the loop
+latency and the cleanup quality, not any single component.
+
+Prior art in the same shape: VoiceInk (Swift + whisper.cpp, GPLv3) and Handy
+(cross-platform, MIT). This clone keeps the loop, swaps every cloud leg for a
+local one, and drops the product chrome (menu bar UI, per-app formatting,
+custom vocab).
+
+## Architecture
+
+Single Python process, CLI daemon. One file: `dictate.py`.
+
+```
+pynput global listener ──▶ state machine ──▶ sounddevice InputStream (16 kHz mono f32)
+      (toggle key)              │                      │ RMS trailing-silence auto-stop
+                                ▼                      ▼
+                        worker thread:  mlx_whisper.transcribe(ndarray)
+                                │              mlx-community/whisper-large-v3-turbo
+                                ▼
+                        POST localhost:11434/api/chat  (llama3.1, temp 0, stream=false)
+                                │        fallback: raw transcript if Ollama is down
+                                ▼
+                        clipboard save → pbcopy cleaned text → synthetic ⌘V → clipboard restore
+```
+
+Flow: tap hotkey → start sound → speak → tap again **or** ~2 s trailing silence →
+stop sound → transcribe → cleanup → paste into focused app.
+
+## Chosen dependencies (and why)
+
+| Leg | Choice | Why / why not the alternative |
+|---|---|---|
+| Transcription | `mlx-whisper` + `mlx-community/whisper-large-v3-turbo` | Canonical on Apple Silicon — MLX runs on the GPU natively. Measured **0.77 s warm for an 11 s clip** on this machine. whisper.cpp is equally capable but adds a build/binary dependency; mlx-whisper is a pip install into the same process. |
+| Cleanup LLM | Ollama `llama3.1` (already installed) | Measured 0.6 s warm. `/api/chat`, `stream:false`, `temperature:0`. Uses what's on the machine; a smaller model (e.g. `llama3.2:3b`) would cut cold-start if wanted. |
+| Mic capture | `sounddevice` (PortAudio) | Standard. 16 kHz mono float32 — Whisper's native input format, no resample step. |
+| Hotkey | `pynput` raw `Listener`, default **right Option (`alt_r`)** | The bare `fn` key (Wispr's default) is not reliably observable from a Python process on macOS, so we deviate: right Option is a dead key most people never press alone. We use a raw `Listener`, not pynput's `GlobalHotKeys` — `GlobalHotKeys` cannot bind a bare modifier (the source of "right Option is not detectable" reports), while the raw listener receives it via `kCGEventFlagsChanged` (verified in pynput's darwin backend: `alt_r = 0x3D`). Configurable via `--key`. |
+| Text insertion | clipboard + synthetic ⌘V, save/restore clipboard via `pbcopy`/`pbpaste` | Char-by-char synthetic typing is slow and drops unicode in some apps (Electron especially). Paste is atomic and works everywhere a text field accepts ⌘V. Clipboard restored ~0.5 s after paste. |
+| Silence detection | RMS threshold on the live stream, stop after ~2 s of trailing silence (armed only after speech is heard) | webrtcvad is another dep for marginal gain at dictation SNR. `--no-auto-stop` disables it. |
+
+**Why not streaming transcription** (the one place we diverge from Wispr's shape):
+batch transcription of a finished utterance costs ~1 s here; streaming would save
+under a second on typical dictation lengths and costs a chunking/partial-merge
+layer plus mid-stream correction handling. Not worth it at local-GPU speed.
+
+## Privacy boundary
+
+- No cloud APIs. Network traffic: `localhost:11434` (Ollama) only.
+- One-time exception: first run downloads model weights from Hugging Face
+  (already cached on this machine at `~/.cache/huggingface`). After that the
+  daemon runs with `HF_HUB_OFFLINE=1` so it can never phone home.
+- Audio lives in memory only; nothing is written to disk.
+
+## macOS permissions (grant to the app that runs the daemon, e.g. Terminal/Ghostty)
+
+| Permission | Needed for | Prompted? |
+|---|---|---|
+| Microphone | recording | auto-prompt on first record |
+| Input Monitoring | pynput global hotkey listener | auto-prompt on first listen |
+| Accessibility | synthetic ⌘V keystroke | must add manually in System Settings → Privacy & Security if paste silently fails |
+
+## Success criteria
+
+1. Tap hotkey in any app → recording starts (audible cue); speak; tap again or
+   pause ~2 s → cleaned text appears in the focused field.
+2. Stop-to-text latency ≤ 3 s for a ~10 s utterance (measured: ~1.5 s warm).
+3. Filler words removed, punctuation/capitalization fixed, wording otherwise preserved.
+4. Ollama down → raw transcript is still inserted (degrade, don't fail).
+5. Zero non-localhost network traffic at runtime.
+
+## Validated so far (pre-implementation spikes)
+
+- `mlx-whisper` on Python 3.13 venv: transcribes verbatim incl. filler words, GPU device confirmed.
+- `say`-generated test clip round-trip: "Um, so basically I think we should, uh,
+  refactor the queue architecture…" → llama3.1 cleanup → "So, we should refactor
+  the queue architecture because each section gets its own message, which avoids
+  the worker timeout." Correct behavior on both legs.
+- Warm latencies: 0.77 s transcribe (11 s clip), 0.6 s cleanup.
+
+## Non-goals
+
+Streaming transcription, menu-bar/settings UI, packaging/notarization,
+per-app tone adaptation, custom vocabulary, multi-language auto-detect.
