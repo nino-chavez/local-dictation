@@ -83,6 +83,36 @@ layer plus mid-stream correction handling. Not worth it at local-GPU speed.
   the worker timeout." Correct behavior on both legs.
 - Warm latencies: 0.77 s transcribe (11 s clip), 0.6 s cleanup.
 
+## Product boundary (decided 2026-07-03)
+
+**This is an input method** — a keyboard replacement: speech in, text out,
+wherever text goes. It is not a notes app, not a voice-data platform. Wispr
+Flow holds the same line deliberately; the input-method job is sharp,
+universal, and latency-critical, while the knowledge job is a different
+product with different physics.
+
+**The rule: dictation may DELIVER text anywhere, but it never STORES
+anything.** Hot-phrase routing (Notes, potentially Reminders) is addressing,
+not archiving — the destination owns what happens after delivery. The moment
+this daemon writes its own file, it owns a schema, a retention story, and a
+second product's roadmap, and every capture-side experiment puts the
+keyboard — the thing that must stay boring and reliable — at risk.
+
+**The parked product: a capture pipeline** (verbatim transcripts, app
+context, timestamps, projections into daily notes/markdown). It is behind a
+demand test: two weeks of real use showing raw voice notes actually get
+reprocessed. If it earns existence, it lives in its own repo and consumes
+the capture seam below — it does not grow inside this one.
+
+**The permitted extension point: a capture seam.** An optional
+`--on-capture <cmd>` hook that pipes a JSON event per dictation to an
+external command and forgets it. Consumers own storage and schema; the
+daemon stays stateless. (Not yet built.)
+
+Scope discipline: v1.x work here is reliability polish, bounded new
+delivery destinations, and the seam. Anything that stores, organizes, or
+projects belongs to the parked product.
+
 ## Added after the core loop shipped
 
 - Prompt-injection hardening on the cleanup pass: the transcript is wrapped in
