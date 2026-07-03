@@ -106,8 +106,12 @@ the capture seam below — it does not grow inside this one.
 
 **The permitted extension point: a capture seam.** An optional
 `--on-capture <cmd>` hook that pipes a JSON event per dictation to an
-external command and forgets it. Consumers own storage and schema; the
-daemon stays stateless. (Not yet built.)
+external command and forgets it (fire-and-forget thread, 10s timeout).
+Event: `{ts, route: paste|note, raw, text, duration_s, app}` — `app` is the
+frontmost bundle id sampled when speaking starts, because that context is
+unrecoverable later. Consumers own storage and schema; the daemon stays
+stateless. Both routes emit: configuring the hook is the consent act, and
+consumers filter.
 
 Scope discipline: v1.x work here is reliability polish, bounded new
 delivery destinations, and the seam. Anything that stores, organizes, or

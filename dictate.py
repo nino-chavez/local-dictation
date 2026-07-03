@@ -148,6 +148,32 @@ def cleanup(text, model, timeout=30):
     return cleaned or text
 
 
+def frontmost_app():
+    try:
+        from AppKit import NSWorkspace
+
+        app = NSWorkspace.sharedWorkspace().frontmostApplication()
+        return app.bundleIdentifier() or app.localizedName()
+    except Exception:
+        return None
+
+
+def emit_capture(cmd, event):
+    """Pipe a capture event (JSON on stdin) to the hook command, fire-and-forget.
+
+    The daemon stays stateless: consumers own storage and schema (see PLAN.md
+    product boundary). A slow or broken hook must never block or crash dictation.
+    """
+    def run():
+        try:
+            subprocess.run(cmd, shell=True, input=json.dumps(event).encode(),
+                           timeout=10, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except Exception as e:
+            log(f"on-capture hook failed ({e.__class__.__name__})")
+
+    threading.Thread(target=run, daemon=True).start()
+
+
 def match_note_phrase(raw):
     """Return the text after a leading note phrase, or None if no match."""
     import re
@@ -210,7 +236,7 @@ def warm_up(args):
         threading.Thread(target=cleanup, args=("warm up", args.model), daemon=True).start()
 
 
-def process(audio, voiced, args):
+def process(audio, voiced, args, app=None):
     if not voiced or len(audio) < SAMPLE_RATE // 2:
         log("no speech detected, discarding")
         play(SOUND_ERROR)
@@ -222,6 +248,12 @@ def process(audio, voiced, args):
         play(SOUND_ERROR)
         return
     log(f"raw       ({time.time() - t0:.1f}s): {raw}")
+
+    def capture_event(route, text):
+        return {"ts": time.strftime("%Y-%m-%dT%H:%M:%S%z"), "route": route,
+                "raw": raw, "text": text,
+                "duration_s": round(len(audio) / SAMPLE_RATE, 1), "app": app}
+
     note_body = match_note_phrase(raw)
     if note_body is not None:
         if not note_body:
@@ -232,6 +264,8 @@ def process(audio, voiced, args):
         if add_note(text):
             log(f"noted     ({time.time() - t0:.1f}s): {text}")
             play(SOUND_NOTE)
+            if args.on_capture:
+                emit_capture(args.on_capture, capture_event("note", text))
         else:
             play(SOUND_ERROR)
         return
@@ -240,6 +274,8 @@ def process(audio, voiced, args):
         log(f"cleaned   ({time.time() - t0:.1f}s): {text}")
     insert_text(text)
     log(f"inserted  ({time.time() - t0:.1f}s)")
+    if args.on_capture:
+        emit_capture(args.on_capture, capture_event("paste", text))
 
 
 def main():
@@ -252,6 +288,9 @@ def main():
     ap.add_argument("--no-auto-stop", action="store_true", help="disable trailing-silence auto-stop")
     ap.add_argument("--silence-secs", type=float, default=2.0, help="trailing silence before auto-stop (default: 2.0)")
     ap.add_argument("--threshold", type=float, default=0.015, help="RMS speech threshold (default: 0.015)")
+    ap.add_argument("--on-capture", metavar="CMD",
+                    help="shell command piped one JSON capture event on stdin per dictation "
+                         "(ts, route, raw, text, duration_s, app); fire-and-forget")
     ap.add_argument("--test-file", help="run transcribe+cleanup on a wav file and print (pipeline check, no mic/hotkey)")
     args = ap.parse_args()
 
@@ -280,11 +319,14 @@ def main():
     log(f"ready — tap {args.key} to dictate, Ctrl-C to quit")
 
     recording = False
+    app = None
     try:
         while True:
             event = events.get()
             if not recording:
                 if event == "toggle":
+                    # sample focus at the moment of speaking, not after processing
+                    app = frontmost_app() if args.on_capture else None
                     recorder.start()
                     recording = True
                     play(SOUND_START)
@@ -294,7 +336,7 @@ def main():
                 play(SOUND_STOP)
                 audio, voiced = recorder.stop()
                 log(f"stopped ({event}, {len(audio) / SAMPLE_RATE:.1f}s)")
-                process(audio, voiced, args)
+                process(audio, voiced, args, app)
                 while not events.empty():  # drop toggles queued while processing
                     events.get_nowait()
     except KeyboardInterrupt:

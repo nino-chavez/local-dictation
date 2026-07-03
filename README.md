@@ -70,8 +70,26 @@ daemon inserts raw transcripts until it returns.
 --no-auto-stop       only the hotkey stops recording
 --silence-secs 2.0   trailing silence before auto-stop
 --language en        spoken language
+--on-capture CMD     capture seam: CMD gets one JSON event on stdin per dictation
 --test-file f.wav    pipeline check without mic/hotkey (prints instead of pastes)
 ```
+
+## Capture seam
+
+`--on-capture` pipes one JSON object per delivered dictation to your command's
+stdin, fire-and-forget (10s timeout, failures logged, never blocks dictation):
+
+```json
+{"ts":"2026-07-03T10:29:42-0500","route":"note","raw":"um take a note, ...",
+ "text":"...","duration_s":4.2,"app":"com.cmuxterm.app"}
+```
+
+`route` is `paste` or `note`; `raw` is the verbatim transcript, `text` what was
+delivered; `app` is the frontmost bundle id when you started speaking. The
+daemon stores nothing — consumers own storage and schema (see PLAN.md product
+boundary). Example consumer: `--on-capture 'cat >> ~/notes/dictation.jsonl'`.
+To use it with the launchd daemon, add the flag to `ProgramArguments` in the
+plist and kickstart.
 
 ## Notes
 
