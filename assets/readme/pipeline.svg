@@ -1,0 +1,78 @@
+<svg xmlns="http://www.w3.org/2000/svg"
+     width="1200" height="240" viewBox="0 0 1200 240"
+     role="img" aria-labelledby="pipeline-title pipeline-desc">
+  <title id="pipeline-title">The dictation loop, five stages</title>
+  <desc id="pipeline-desc">Hotkey toggles recording, sounddevice captures 16kHz mono audio with RMS auto-stop, MLX Whisper transcribes on-GPU, Ollama llama3.1 cleans the transcript (or is skipped if unreachable), and the result is delivered by paste or to Notes. An optional --on-capture hook taps the delivery event to an external, stateless consumer.</desc>
+
+  <rect width="1200" height="240" rx="20" fill="#0a0908"/>
+
+  <g font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif">
+
+    <!-- connecting arrows -->
+    <g stroke="#3a352e" stroke-width="1.5" fill="none">
+      <path d="M240 90 H294"/>
+      <path d="M462 90 H516"/>
+      <path d="M684 90 H738"/>
+      <path d="M906 90 H960"/>
+    </g>
+    <g fill="#3a352e">
+      <path d="M294 90 L286 85 L286 95 Z"/>
+      <path d="M516 90 L508 85 L508 95 Z"/>
+      <path d="M738 90 L730 85 L730 95 Z"/>
+      <path d="M960 90 L952 85 L952 95 Z"/>
+    </g>
+
+    <!-- 01 hotkey -->
+    <g transform="translate(72 44)">
+      <rect width="168" height="92" rx="10" fill="#100f0d" stroke="#241f1a"/>
+      <text x="16" y="24" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="10" letter-spacing="1.5" fill="#7a746b">01 · HOTKEY</text>
+      <text x="16" y="48" font-size="15" font-weight="600" fill="#f2ede4">tap alt_r</text>
+      <text x="16" y="66" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="10.5" fill="#68625a">raw pynput listener</text>
+      <text x="16" y="80" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="10.5" fill="#68625a">toggles from any app</text>
+    </g>
+
+    <!-- 02 record -->
+    <g transform="translate(294 44)">
+      <rect width="168" height="92" rx="10" fill="#100f0d" stroke="#241f1a"/>
+      <text x="16" y="24" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="10" letter-spacing="1.5" fill="#7a746b">02 · RECORD</text>
+      <text x="16" y="48" font-size="15" font-weight="600" fill="#f2ede4">sounddevice</text>
+      <text x="16" y="66" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="10.5" fill="#68625a">16kHz mono capture</text>
+      <text x="16" y="80" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="10.5" fill="#68625a">RMS trailing-silence stop</text>
+    </g>
+
+    <!-- 03 transcribe -->
+    <g transform="translate(516 44)">
+      <rect width="168" height="92" rx="10" fill="#100f0d" stroke="#241f1a"/>
+      <text x="16" y="24" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="10" letter-spacing="1.5" fill="#7a746b">03 · TRANSCRIBE</text>
+      <text x="16" y="48" font-size="15" font-weight="600" fill="#f2ede4">MLX Whisper</text>
+      <text x="16" y="66" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="10.5" fill="#68625a">large-v3-turbo</text>
+      <text x="16" y="80" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="10.5" fill="#68625a">on-GPU, in-process</text>
+    </g>
+
+    <!-- 04 cleanup -->
+    <g transform="translate(738 44)">
+      <rect width="168" height="92" rx="10" fill="#100f0d" stroke="#241f1a"/>
+      <text x="16" y="24" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="10" letter-spacing="1.5" fill="#7a746b">04 · CLEANUP</text>
+      <text x="16" y="48" font-size="15" font-weight="600" fill="#f2ede4">Ollama llama3.1</text>
+      <text x="16" y="66" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="10.5" fill="#68625a">fillers + punctuation</text>
+      <text x="16" y="80" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="10.5" fill="#68625a">down → raw text lands</text>
+    </g>
+
+    <!-- 05 deliver -->
+    <g transform="translate(960 44)">
+      <rect width="168" height="92" rx="10" fill="#100f0d" stroke="#ff7a3d" stroke-opacity="0.5"/>
+      <text x="16" y="24" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="10" letter-spacing="1.5" fill="#ff7a3d">05 · DELIVER</text>
+      <text x="16" y="48" font-size="15" font-weight="600" fill="#f2ede4">paste, or Notes</text>
+      <text x="16" y="66" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="10.5" fill="#68625a">⌘V, clipboard restored</text>
+      <text x="16" y="80" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="10.5" fill="#68625a">"take a note" → Notes</text>
+    </g>
+
+    <!-- optional capture seam, tapped off delivery -->
+    <line x1="1044" y1="136" x2="1044" y2="162" stroke="#544d43" stroke-width="1.5" stroke-dasharray="3 3"/>
+    <g transform="translate(960 162)">
+      <rect width="168" height="40" rx="8" fill="#100f0d" stroke="#241f1a"/>
+      <text x="16" y="17" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="10.5" fill="#7a746b">--on-capture</text>
+      <text x="16" y="32" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="10" fill="#544d43">optional · stateless</text>
+    </g>
+  </g>
+</svg>

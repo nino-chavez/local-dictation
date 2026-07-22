@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg"
+     width="1200" height="380" viewBox="0 0 1200 380"
+     role="img" aria-labelledby="hero-title hero-desc">
+  <title id="hero-title">local-dictation — fully local dictation for macOS</title>
+  <desc id="hero-desc">Tap a key, speak, and cleaned-up text is pasted wherever the cursor is. A real terminal log shows one dictation cycle: hotkey, on-GPU Whisper transcription, Ollama cleanup, and paste — with zero network traffic beyond localhost.</desc>
+
+  <rect width="1200" height="380" rx="20" fill="#0a0908"/>
+
+  <!-- left: identity -->
+  <g font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif">
+    <text x="56" y="70" font-family="ui-monospace, SFMono-Regular, Menlo, monospace"
+          font-size="13" letter-spacing="2.5" fill="#7a746b">macOS · APPLE SILICON</text>
+    <circle cx="296" cy="66" r="4" fill="#ff7a3d"/>
+    <text x="308" y="70" font-family="ui-monospace, SFMono-Regular, Menlo, monospace"
+          font-size="13" letter-spacing="2.5" fill="#ff7a3d">FULLY LOCAL</text>
+
+    <text x="54" y="140" font-size="56" font-weight="700" fill="#f2ede4">local-dictation</text>
+
+    <text x="56" y="184" font-size="18" fill="#c9c3b8">Tap a key, speak — clean text lands wherever</text>
+    <text x="56" y="210" font-size="18" fill="#c9c3b8">the cursor is. Nothing leaves this Mac.</text>
+
+    <line x1="56" y1="246" x2="616" y2="246" stroke="#211f1c" stroke-width="1"/>
+
+    <text x="56" y="278" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="14" fill="#f2ede4">0.77s</text>
+    <text x="98" y="278" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="12" fill="#7a746b">transcribe</text>
+    <text x="200" y="278" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="14" fill="#f2ede4">0.6s</text>
+    <text x="234" y="278" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="12" fill="#7a746b">cleanup</text>
+    <text x="56" y="308" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="12" fill="#7a746b">network: localhost:11434 only — Whisper and paste never touch the wire</text>
+  </g>
+
+  <!-- right: real terminal proof -->
+  <g>
+    <rect x="700" y="48" width="444" height="284" rx="10" fill="#100f0d" stroke="#241f1a" stroke-width="1"/>
+    <line x1="700" y1="80" x2="1144" y2="80" stroke="#211f1c" stroke-width="1"/>
+    <circle cx="720" cy="64" r="4" fill="#332e28"/>
+    <circle cx="736" cy="64" r="4" fill="#332e28"/>
+    <circle cx="752" cy="64" r="4" fill="#332e28"/>
+    <text x="1126" y="68" text-anchor="end" font-family="ui-monospace, SFMono-Regular, Menlo, monospace"
+          font-size="11" letter-spacing="1.5" fill="#544d43">local-dictation.log</text>
+
+    <g font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="12.5">
+      <text x="718" y="104" fill="#8a8378">$ .venv/bin/python dictate.py</text>
+      <text x="718" y="128" fill="#68625a">[10:29:41] loading whisper-large-v3-turbo ...</text>
+      <text x="718" y="152" fill="#68625a">[10:29:42] whisper ready</text>
+      <text x="718" y="176" fill="#c9c3b8">[10:29:42] ready — tap alt_r to dictate</text>
+
+      <circle cx="722" cy="196" r="3" fill="#ff7a3d"/>
+      <text x="734" y="200" fill="#ff7a3d">[10:29:47] recording...</text>
+
+      <text x="718" y="224" fill="#c9c3b8">[10:29:51] stopped (auto_stop, 4.2s)</text>
+      <text x="718" y="248" fill="#68625a">[10:29:51] raw       (0.8s): um so, basically...</text>
+      <text x="718" y="272" fill="#f2ede4">[10:29:52] cleaned   (1.4s): So, we should refactor...</text>
+      <text x="718" y="296" fill="#c9c3b8">[10:29:52] inserted  (1.5s)</text>
+    </g>
+  </g>
+</svg>
