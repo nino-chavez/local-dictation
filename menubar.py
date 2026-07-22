@@ -12,7 +12,7 @@ from pathlib import Path
 
 import rumps
 
-LABEL = "com.nino.local-dictation"
+LABEL = "com.local-dictation.daemon"
 PLIST = Path.home() / "Library/LaunchAgents" / f"{LABEL}.plist"
 LOG = Path.home() / "Library/Logs/local-dictation.log"
 DOMAIN = f"gui/{os.getuid()}"

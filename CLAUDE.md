@@ -31,7 +31,7 @@ uv pip install --python .venv/bin/python mlx-whisper sounddevice pynput rumps
 .venv/bin/python dictate.py
 
 # the deployed instance runs under launchd — after editing dictate.py, restart it:
-launchctl kickstart -k gui/$UID/com.nino.local-dictation
+launchctl kickstart -k gui/$UID/com.local-dictation.daemon
 tail ~/Library/Logs/local-dictation.log
 ```
 
@@ -54,7 +54,7 @@ delivery on a fire-and-forget thread.
 
 `menubar.py` never owns the daemon process — it drives the launchd job via
 `launchctl bootstrap/kickstart/bootout` and polls `pgrep`. Both are deployed as
-launchd agents (`com.nino.local-dictation[.menubar].plist` in
+launchd agents (`com.local-dictation.daemon.plist` / `com.local-dictation.menubar.plist` in
 `~/Library/LaunchAgents/`).
 
 ## Non-obvious constraints

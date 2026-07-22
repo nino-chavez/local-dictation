@@ -3,16 +3,16 @@
 <plist version="1.0">
 <dict>
   <key>Label</key>
-  <string>com.nino.local-dictation</string>
+  <string>com.local-dictation.daemon</string>
 
   <key>ProgramArguments</key>
   <array>
-    <string>/Users/nino/Workspace/dev/wip/local-dictation/.venv/bin/python</string>
-    <string>/Users/nino/Workspace/dev/wip/local-dictation/dictate.py</string>
+    <string>/Users/nino/Workspace/dev/tools/local-dictation/.venv/bin/python</string>
+    <string>/Users/nino/Workspace/dev/tools/local-dictation/dictate.py</string>
   </array>
 
   <key>WorkingDirectory</key>
-  <string>/Users/nino/Workspace/dev/wip/local-dictation</string>
+  <string>/Users/nino/Workspace/dev/tools/local-dictation</string>
 
   <key>RunAtLoad</key>
   <true/>

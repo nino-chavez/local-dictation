@@ -48,8 +48,8 @@ recording.
 ```mermaid
 flowchart LR
     subgraph launchd gui domain
-        D[com.nino.local-dictation<br/>dictate.py, KeepAlive]
-        T[com.nino.local-dictation.menubar<br/>menubar.py, KeepAlive]
+        D[com.local-dictation.daemon<br/>dictate.py, KeepAlive]
+        T[com.local-dictation.menubar<br/>menubar.py, KeepAlive]
     end
     T -->|launchctl bootstrap / kickstart / bootout| D
     T -->|pgrep poll, 3s| D

@@ -49,8 +49,8 @@ Two launchd agents, installed by copying both plists to `~/Library/LaunchAgents/
 and `launchctl bootstrap gui/$UID <plist>` each (opt-in — the daemon has mic +
 Input Monitoring access):
 
-- `com.nino.local-dictation.plist` — the dictation daemon (`dictate.py`)
-- `com.nino.local-dictation.menubar.plist` — the tray app (`menubar.py`): a
+- `com.local-dictation.daemon.plist` — the dictation daemon (`dictate.py`)
+- `com.local-dictation.menubar.plist` — the tray app (`menubar.py`): a
   ◉/○ menu-bar icon with Start / Stop / Open Log / Quit. It drives the
   daemon's launchd job via `launchctl` rather than owning the process, so
   launchd stays the single owner (crash-restart, logging) and the tray needs
@@ -59,11 +59,11 @@ Input Monitoring access):
 Manual control (same thing the tray does):
 
 ```sh
-launchctl bootout gui/$UID/com.nino.local-dictation      # stop
-launchctl bootstrap gui/$UID ~/Library/LaunchAgents/com.nino.local-dictation.plist  # start
+launchctl bootout gui/$UID/com.local-dictation.daemon      # stop
+launchctl bootstrap gui/$UID ~/Library/LaunchAgents/com.local-dictation.daemon.plist  # start
 ```
 
-Status and logs: `launchctl print gui/$UID/com.nino.local-dictation`,
+Status and logs: `launchctl print gui/$UID/com.local-dictation.daemon`,
 `~/Library/Logs/local-dictation.log` (daemon), `local-dictation-menubar.log` (tray).
 
 Permissions caveat: under launchd there's no hosting terminal, so macOS
