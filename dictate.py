@@ -127,7 +127,7 @@ def cleanup(text, model, timeout=30):
     payload = json.dumps({
         "model": model,
         "stream": False,
-        "keep_alive": "60m",
+        "keep_alive": "5m",
         "options": {"temperature": 0},
         "messages": [
             {"role": "system", "content": CLEANUP_SYSTEM_PROMPT},
@@ -226,16 +226,6 @@ def resolve_key(name):
     sys.exit(f"unknown key {name!r} — use a pynput key name like alt_r, cmd_r, f13")
 
 
-def warm_up(args):
-    import numpy as np
-
-    log(f"loading {args.whisper} ...")
-    transcribe(np.zeros(SAMPLE_RATE // 2, dtype=np.float32), args.whisper, args.language)
-    log("whisper ready")
-    if not args.no_cleanup:
-        threading.Thread(target=cleanup, args=("warm up", args.model), daemon=True).start()
-
-
 def process(audio, voiced, args, app=None):
     if not voiced or len(audio) < SAMPLE_RATE // 2:
         log("no speech detected, discarding")
@@ -305,7 +295,6 @@ def main():
 
     from pynput import keyboard
 
-    warm_up(args)
     events = queue.Queue()
     recorder = Recorder(events, args.threshold, args.silence_secs, not args.no_auto_stop)
     toggle_key = resolve_key(args.key)
