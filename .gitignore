@@ -5,3 +5,6 @@ __pycache__/
 
 # Agent scratch directory, not source.
 .codex-scratch/
+
+# Nested git repo with its own remote; git add here would store a gitlink, not files.
+ios-dictation-design/
