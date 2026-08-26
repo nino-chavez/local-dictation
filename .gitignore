@@ -2,3 +2,6 @@
 __pycache__/
 *.pyc
 .DS_Store
+
+# Agent scratch directory, not source.
+.codex-scratch/
