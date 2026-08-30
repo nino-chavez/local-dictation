@@ -7,6 +7,7 @@ Nothing leaves the machine; the only network traffic is localhost:11434.
 """
 
 import argparse
+import hashlib
 import json
 import os
 import queue
@@ -20,6 +21,22 @@ from pathlib import Path
 
 SAMPLE_RATE = 16_000
 OLLAMA_URL = "http://localhost:11434/api/chat"
+
+# The Whisper snapshot is pinned, not tracked. mlx_whisper resolves a repo id
+# with snapshot_download() and no revision, so it silently follows whatever the
+# repo's main branch points at today.
+#
+# Yawn owns these three values — it packages this model into a distributed DMG
+# and its build fails on a digest mismatch. This file is a consumer: on a
+# bump, change apps/yawn-app/worker/build_runtime.sh first and copy here.
+# Sharing the pin is what keeps one model on the machine rather than two that
+# drift apart with nothing to notice it.
+WHISPER_REPO = "mlx-community/whisper-large-v3-turbo"
+WHISPER_REVISION = "a4aaeec0636e6fef84abdcbe3544cb2bf7e9f6fb"
+WHISPER_DIGESTS = {
+    "config.json": "b34fc29e4e11e0a25e812775dd67f4dd16fc2c8eb43d28ae25ff7d660ecb6379",
+    "weights.safetensors": "951ed3fc1203e6a62467abb2144a96ce7eafca8fa77e3704fdb8635ff3e7f8a6",
+}
 
 CLEANUP_SYSTEM_PROMPT = (
     "You are a transcript cleaner. The user message contains dictated speech "
@@ -59,6 +76,55 @@ def offline_if_cached(repo_id):
     cache = Path.home() / ".cache/huggingface/hub" / ("models--" + repo_id.replace("/", "--"))
     if cache.exists():
         os.environ["HF_HUB_OFFLINE"] = "1"
+
+
+def digest_matches(path, expected):
+    """Whether path's contents hash to expected.
+
+    The hub stores large files under a blob name that is their sha256, so when
+    the snapshot symlink already points at a blob of that name the digest is
+    established by the download and nothing has to be read. That shortcut
+    proves the snapshot holds the file the hub served for this revision — the
+    failure it catches is a wrong or moved revision, not local tampering.
+    Everything else is hashed outright.
+    """
+    if os.path.basename(os.path.realpath(path)) == expected:
+        return True
+    digest = hashlib.sha256()
+    with open(path, "rb") as handle:
+        for chunk in iter(lambda: handle.read(1 << 20), b""):
+            digest.update(chunk)
+    return digest.hexdigest() == expected
+
+
+def whisper_model_path(repo):
+    """Resolve the Whisper repo id to a pinned local snapshot directory.
+
+    Returns the argument untouched for a local path or any repo other than the
+    default — `--whisper` stays an escape hatch, and pinning a revision of a
+    repo we know nothing about would be wrong.
+    """
+    if repo != WHISPER_REPO or Path(repo).exists():
+        offline_if_cached(repo)
+        return repo
+
+    snapshot = (Path.home() / ".cache/huggingface/hub"
+                / ("models--" + repo.replace("/", "--")) / "snapshots" / WHISPER_REVISION)
+    if not snapshot.is_dir():
+        from huggingface_hub import snapshot_download
+
+        log(f"fetching {repo} at {WHISPER_REVISION[:12]}")
+        snapshot = Path(snapshot_download(repo_id=repo, revision=WHISPER_REVISION))
+
+    os.environ.setdefault("HF_HUB_OFFLINE", "1")
+    for name, want in WHISPER_DIGESTS.items():
+        path = snapshot / name
+        if not path.exists():
+            sys.exit(f"whisper snapshot {WHISPER_REVISION[:12]} is missing {name}")
+        if not digest_matches(path, want):
+            sys.exit(f"whisper {name} does not match the pinned digest at {snapshot}")
+    log(f"whisper   {repo} @ {WHISPER_REVISION[:12]} (pinned, digests match)")
+    return str(snapshot)
 
 
 class Recorder:
@@ -319,7 +385,8 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--key", default="alt_r", help="toggle key, pynput name (default: alt_r = right Option)")
     ap.add_argument("--model", default="llama3.1", help="Ollama model for cleanup (default: llama3.1)")
-    ap.add_argument("--whisper", default="mlx-community/whisper-large-v3-turbo", help="MLX whisper repo id")
+    ap.add_argument("--whisper", default=WHISPER_REPO,
+                    help="MLX whisper repo id (the default is revision-pinned; anything else is not)")
     ap.add_argument("--language", default="en", help="spoken language (default: en)")
     ap.add_argument("--no-cleanup", action="store_true", help="insert the raw transcript, skip Ollama")
     ap.add_argument("--no-auto-stop", action="store_true", help="disable trailing-silence auto-stop")
@@ -331,7 +398,7 @@ def main():
     ap.add_argument("--test-file", help="run transcribe+cleanup on a wav file and print (pipeline check, no mic/hotkey)")
     args = ap.parse_args()
 
-    offline_if_cached(args.whisper)
+    args.whisper = whisper_model_path(args.whisper)
 
     if args.test_file:
         raw = transcribe(args.test_file, args.whisper, args.language)

@@ -38,7 +38,7 @@ stop sound → transcribe → cleanup → paste into focused app.
 
 | Leg | Choice | Why / why not the alternative |
 |---|---|---|
-| Transcription | `mlx-whisper` + `mlx-community/whisper-large-v3-turbo` | Canonical on Apple Silicon — MLX runs on the GPU natively. Measured **0.77 s warm for an 11 s clip** on this machine. whisper.cpp is equally capable but adds a build/binary dependency; mlx-whisper is a pip install into the same process. |
+| Transcription | `mlx-whisper` + `mlx-community/whisper-large-v3-turbo`, pinned to one revision | Canonical on Apple Silicon — MLX runs on the GPU natively. Measured **0.77 s warm for an 11 s clip** on this machine. whisper.cpp is equally capable but adds a build/binary dependency; mlx-whisper is a pip install into the same process. |
 | Cleanup LLM | Ollama `llama3.1` (already installed) | Measured 0.6 s warm. `/api/chat`, `stream:false`, `temperature:0`. Uses what's on the machine; a smaller model (e.g. `llama3.2:3b`) would cut cold-start if wanted. |
 | Mic capture | `sounddevice` (PortAudio) | Standard. 16 kHz mono float32 — Whisper's native input format, no resample step. |
 | Hotkey | `pynput` raw `Listener`, default **right Option (`alt_r`)** | The bare `fn` key (Wispr's default) is not reliably observable from a Python process on macOS, so we deviate: right Option is a dead key most people never press alone. We use a raw `Listener`, not pynput's `GlobalHotKeys` — `GlobalHotKeys` cannot bind a bare modifier (the source of "right Option is not detectable" reports), while the raw listener receives it via `kCGEventFlagsChanged` (verified in pynput's darwin backend: `alt_r = 0x3D`). Configurable via `--key`. |
@@ -55,7 +55,9 @@ layer plus mid-stream correction handling. Not worth it at local-GPU speed.
 - No cloud APIs. Network traffic: `localhost:11434` (Ollama) only.
 - One-time exception: first run downloads model weights from Hugging Face
   (already cached on this machine at `~/.cache/huggingface`). After that the
-  daemon runs with `HF_HUB_OFFLINE=1` so it can never phone home.
+  daemon runs with `HF_HUB_OFFLINE=1` so it can never phone home. The download
+  names a revision, so a cleared cache refetches the same snapshot rather than
+  whatever the repo's main branch has moved to.
 - Audio lives in memory only; nothing is written to disk.
 
 ## macOS permissions (grant to the app that runs the daemon, e.g. Terminal/Ghostty)
@@ -147,6 +149,19 @@ projects belongs to the parked product.
   API. Many apps (terminals, Electron) do not expose `AXValue`, so it needs
   FluidVoice's enum of unverifiable outcomes to avoid crying wolf on exactly
   the apps this daemon is used in.
+
+- Whisper snapshot pinned by revision and digest, shared with Yawn. Both tools
+  run `mlx-community/whisper-large-v3-turbo` off the same Hugging Face cache
+  entry, but only Yawn pinned it — `mlx_whisper` calls `snapshot_download()`
+  with no revision, so this daemon followed the repo's main branch and the two
+  would have diverged on the next cache clear with nothing to report it. They
+  are on the same bytes today by coincidence of download date, which is not a
+  mechanism. Yawn stays the owner of the three values because its build fails
+  on a mismatch and it ships the model in a DMG; this repo copies them and
+  checks on startup. The weights check is free — the hub stores large blobs
+  under a name that is their sha256, so the snapshot symlink already carries
+  the digest and the 1.6 GB is never read. `--whisper` still passes any other
+  repo or path straight through unpinned.
 
 ## Non-goals
 
