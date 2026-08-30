@@ -86,6 +86,67 @@ layer plus mid-stream correction handling. Not worth it at local-GPU speed.
   the worker timeout." Correct behavior on both legs.
 - Warm latencies: 0.77 s transcribe (11 s clip), 0.6 s cleanup.
 
+## Measured latency (2026-08-30, M3 Max)
+
+The spike numbers above are pre-implementation and measure only the two legs
+that existed then. This is the whole loop, on the shipped code.
+
+**Start — tap to microphone running: 83 ms median, 92 ms p90** (n=10 warm).
+`sd.InputStream(...)` is 45 ms of it and `.start()` 38 ms; `focus_target()` is
+0.1 ms and does not register. It cannot clip speech: `play(SOUND_START)` is
+fired after `recorder.start()` and through a non-blocking `Popen`, so capture
+is already running before the user is told to speak. Cold — the first tap after
+the daemon starts — is 194-260 ms across three fresh processes, ~90 ms of it
+`import sounddevice`.
+
+One outlier is recorded rather than averaged away: the very first measured
+cycle took 36 s. It did not reproduce in any later run and is most plausibly
+macOS evaluating the microphone grant for that Python binary in a new exec
+context. Not a number to design against; noted so the next person who sees it
+knows it has been seen.
+
+**Stop to text — 6.5 s clip, warm:**
+
+| Leg | Median |
+|---|---|
+| transcribe (mlx-whisper) | 0.40 s (16x realtime) |
+| cleanup (Ollama, model resident) | 0.32 s |
+| **total** | **0.72 s** |
+
+Against a 3.0 s success criterion, so the loop runs about 4x inside its own
+budget. Cold first transcribe is 3.11 s (model load onto the GPU).
+
+**The one real latency cost is the cleanup model going cold.** `keep_alive: 5m`
+releases llama3.1 after five idle minutes, and reloading 9 GB onto the GPU costs
+**1.71 s against 0.32 s warm — a 1.39 s penalty**, measured by stopping the model
+and re-running. So a burst of dictation runs at ~0.72 s stop-to-text and the
+first one after a break runs at ~2.1 s. Both pass, but the second is the one
+that gets noticed, and it is the common case for intermittent use.
+
+That is the tradeoff the on-demand load bought (commit e4b973a): 9 GB of
+resident GPU memory against 1.39 s on the first dictation after a pause. The
+third option is the one this file already named and never priced — a smaller
+cleanup model such as `llama3.2:3b` — which would shrink both sides at some
+cost to cleanup quality, and cleanup quality is half of what the product is.
+Unmeasured: no small model is installed on this machine.
+
+### What this settles about the FluidVoice borrows
+
+Three candidates from the 2026-08-30 comparison die here, on measurement:
+
+- **A direct Core Audio input path** (FluidVoice's `DirectCoreAudioInput`,
+  built for "faster recording start"). 83 ms is already absorbed before the
+  audio cue. There is no clipping to fix.
+- **Parakeet as a faster model.** Transcription is 0.40 s of a 0.72 s loop that
+  is 4x inside budget. A faster model saves time nobody is waiting on.
+- **Re-opening the streaming question.** The rejection above was reasoned at
+  Whisper batch speed and the argument was that a faster model might change the
+  input. It does not, because the model is not the constraint and there is no
+  constraint.
+
+What survives from that comparison is the focus guard, already shipped, and the
+shared model pin below.
+
 ## Product boundary (decided 2026-07-03)
 
 **This is an input method** — a keyboard replacement: speech in, text out,
