@@ -49,7 +49,10 @@ callback posts `"auto_stop"` on trailing silence. The main loop starts/stops the
 the numpy array directly) → `match_note_phrase()` routing → `cleanup()` (Ollama
 `/api/chat`, falls back to the raw transcript if Ollama is down) → `insert_text()`
 (clipboard + synthetic ⌘V, clipboard saved/restored) or `add_note()` (osascript
-to Notes, background, no focus steal). `--on-capture` emits a JSON event per
+to Notes, background, no focus steal). `focus_target()` samples the frontmost
+bundle id and pid when speaking starts; `insert_text()` re-activates that pid
+before pasting and refuses the paste if it cannot, so a focus change during the
+~1.5 s pipeline cannot land the text in another app. `--on-capture` emits a JSON event per
 delivery on a fire-and-forget thread.
 
 `menubar.py` never owns the daemon process — it drives the launchd job via

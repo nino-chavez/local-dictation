@@ -148,14 +148,44 @@ def cleanup(text, model, timeout=30):
     return cleaned or text
 
 
-def frontmost_app():
+def focus_target():
+    """Bundle id and pid of the frontmost app, sampled when speaking starts.
+
+    Transcription and cleanup take ~1.5 s, which is long enough for focus to
+    drift — a notification, a click away. The pid is what lets insert_text put
+    the paste back where the words were aimed; the bundle id is what the
+    --on-capture event reports.
+    """
     try:
         from AppKit import NSWorkspace
 
         app = NSWorkspace.sharedWorkspace().frontmostApplication()
-        return app.bundleIdentifier() or app.localizedName()
+        if app is None:
+            return None, None
+        return (app.bundleIdentifier() or app.localizedName()), app.processIdentifier()
     except Exception:
-        return None
+        return None, None
+
+
+def restore_focus(pid, timeout=0.5):
+    """Bring pid back to the front. True once it is frontmost, False on timeout."""
+    try:
+        from AppKit import NSRunningApplication, NSWorkspace
+
+        app = NSRunningApplication.runningApplicationWithProcessIdentifier_(pid)
+        if app is None or app.isTerminated():
+            return False
+        app.activateWithOptions_(0)
+        workspace = NSWorkspace.sharedWorkspace()
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            current = workspace.frontmostApplication()
+            if current is not None and current.processIdentifier() == pid:
+                return True
+            time.sleep(0.02)
+        return False
+    except Exception:
+        return False
 
 
 def emit_capture(cmd, event):
@@ -202,9 +232,21 @@ def set_clipboard(data):
     subprocess.run(["pbcopy"], input=data)
 
 
-def insert_text(text):
-    """Paste via clipboard + synthetic Cmd+V, then restore the old clipboard."""
+def insert_text(text, pid=None):
+    """Paste via clipboard + synthetic Cmd+V, then restore the old clipboard.
+
+    If focus drifted while we were transcribing, put it back on the app that
+    was frontmost when speaking started — pasting into whatever happens to be
+    in front now is the failure this guards against. A drifted paste is
+    unrecoverable: the text is gone into someone else's text field.
+    """
     from pynput.keyboard import Controller, Key
+
+    if pid is not None:
+        current = focus_target()[1]
+        if current != pid and not restore_focus(pid):
+            log(f"focus moved to pid {current}, could not return to {pid} — not pasting")
+            return False
 
     saved = get_clipboard()
     set_clipboard(text.encode())
@@ -214,6 +256,7 @@ def insert_text(text):
         kb.tap("v")
     time.sleep(0.5)  # let the focused app read the clipboard before restoring
     set_clipboard(saved)
+    return True
 
 
 def resolve_key(name):
@@ -226,7 +269,7 @@ def resolve_key(name):
     sys.exit(f"unknown key {name!r} — use a pynput key name like alt_r, cmd_r, f13")
 
 
-def process(audio, voiced, args, app=None):
+def process(audio, voiced, args, target=(None, None)):
     if not voiced or len(audio) < SAMPLE_RATE // 2:
         log("no speech detected, discarding")
         play(SOUND_ERROR)
@@ -238,6 +281,8 @@ def process(audio, voiced, args, app=None):
         play(SOUND_ERROR)
         return
     log(f"raw       ({time.time() - t0:.1f}s): {raw}")
+
+    app, pid = target
 
     def capture_event(route, text):
         return {"ts": time.strftime("%Y-%m-%dT%H:%M:%S%z"), "route": route,
@@ -262,7 +307,9 @@ def process(audio, voiced, args, app=None):
     text = raw if args.no_cleanup else cleanup(raw, args.model)
     if text != raw:
         log(f"cleaned   ({time.time() - t0:.1f}s): {text}")
-    insert_text(text)
+    if not insert_text(text, pid):
+        play(SOUND_ERROR)
+        return  # no capture event — nothing was delivered
     log(f"inserted  ({time.time() - t0:.1f}s)")
     if args.on_capture:
         emit_capture(args.on_capture, capture_event("paste", text))
@@ -308,14 +355,14 @@ def main():
     log(f"ready — tap {args.key} to dictate, Ctrl-C to quit")
 
     recording = False
-    app = None
+    target = (None, None)
     try:
         while True:
             event = events.get()
             if not recording:
                 if event == "toggle":
                     # sample focus at the moment of speaking, not after processing
-                    app = frontmost_app() if args.on_capture else None
+                    target = focus_target()
                     recorder.start()
                     recording = True
                     play(SOUND_START)
@@ -325,7 +372,7 @@ def main():
                 play(SOUND_STOP)
                 audio, voiced = recorder.stop()
                 log(f"stopped ({event}, {len(audio) / SAMPLE_RATE:.1f}s)")
-                process(audio, voiced, args, app)
+                process(audio, voiced, args, target)
                 while not events.empty():  # drop toggles queued while processing
                     events.get_nowait()
     except KeyboardInterrupt:

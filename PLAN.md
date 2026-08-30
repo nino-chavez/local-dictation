@@ -27,7 +27,8 @@ pynput global listener ──▶ state machine ──▶ sounddevice InputStream
                         POST localhost:11434/api/chat  (llama3.1, temp 0, stream=false)
                                 │        fallback: raw transcript if Ollama is down
                                 ▼
-                        clipboard save → pbcopy cleaned text → synthetic ⌘V → clipboard restore
+                        focus guard (restore captured pid) → clipboard save →
+                        pbcopy cleaned text → synthetic ⌘V → clipboard restore
 ```
 
 Flow: tap hotkey → start sound → speak → tap again **or** ~2 s trailing silence →
@@ -41,7 +42,7 @@ stop sound → transcribe → cleanup → paste into focused app.
 | Cleanup LLM | Ollama `llama3.1` (already installed) | Measured 0.6 s warm. `/api/chat`, `stream:false`, `temperature:0`. Uses what's on the machine; a smaller model (e.g. `llama3.2:3b`) would cut cold-start if wanted. |
 | Mic capture | `sounddevice` (PortAudio) | Standard. 16 kHz mono float32 — Whisper's native input format, no resample step. |
 | Hotkey | `pynput` raw `Listener`, default **right Option (`alt_r`)** | The bare `fn` key (Wispr's default) is not reliably observable from a Python process on macOS, so we deviate: right Option is a dead key most people never press alone. We use a raw `Listener`, not pynput's `GlobalHotKeys` — `GlobalHotKeys` cannot bind a bare modifier (the source of "right Option is not detectable" reports), while the raw listener receives it via `kCGEventFlagsChanged` (verified in pynput's darwin backend: `alt_r = 0x3D`). Configurable via `--key`. |
-| Text insertion | clipboard + synthetic ⌘V, save/restore clipboard via `pbcopy`/`pbpaste` | Char-by-char synthetic typing is slow and drops unicode in some apps (Electron especially). Paste is atomic and works everywhere a text field accepts ⌘V. Clipboard restored ~0.5 s after paste. |
+| Text insertion | clipboard + synthetic ⌘V, save/restore clipboard via `pbcopy`/`pbpaste`, guarded by a focus target | Char-by-char synthetic typing is slow and drops unicode in some apps (Electron especially). Paste is atomic and works everywhere a text field accepts ⌘V. Clipboard restored ~0.5 s after paste. The frontmost pid is sampled when speaking starts and re-activated before pasting: transcribe + cleanup is ~1.5 s, long enough for a notification or a click to move focus, and a paste into the wrong app is silent and unrecoverable. If the pid cannot be brought back, the paste is refused and the error sound plays — the text stays in the log. |
 | Silence detection | RMS threshold on the live stream, stop after ~2 s of trailing silence (armed only after speech is heard) | webrtcvad is another dep for marginal gain at dictation SNR. `--no-auto-stop` disables it. |
 
 **Why not streaming transcription** (the one place we diverge from Wispr's shape):
@@ -133,6 +134,19 @@ projects belongs to the parked product.
   `osascript` creates the note without stealing focus. Matching runs on the
   raw transcript (cleanup may reword the trigger); the remainder still gets
   the cleanup pass.
+
+- Focus guard on the paste path (borrowed from FluidVoice's `TypingService`
+  behavior, reimplemented — that code is GPLv3 and this is not). The frontmost
+  pid is now sampled on every dictation, not only when `--on-capture` is set,
+  and `insert_text` re-activates it before pasting. The window it closes is the
+  ~1.5 s of transcribe + cleanup, during which a notification or a click can
+  move focus; the old code pasted into whatever was in front by then, silently.
+  When the captured pid cannot be brought back the paste is refused rather than
+  aimed blind — the text is already in the log, so a refusal is recoverable and
+  a misdelivery is not. Not borrowed: paste verification via the accessibility
+  API. Many apps (terminals, Electron) do not expose `AXValue`, so it needs
+  FluidVoice's enum of unverifiable outcomes to avoid crying wolf on exactly
+  the apps this daemon is used in.
 
 ## Non-goals
 
