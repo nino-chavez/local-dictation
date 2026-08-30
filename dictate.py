@@ -7,6 +7,7 @@ Nothing leaves the machine; the only network traffic is localhost:11434.
 """
 
 import argparse
+import hashlib
 import json
 import os
 import queue
@@ -20,6 +21,22 @@ from pathlib import Path
 
 SAMPLE_RATE = 16_000
 OLLAMA_URL = "http://localhost:11434/api/chat"
+
+# The Whisper snapshot is pinned, not tracked. mlx_whisper resolves a repo id
+# with snapshot_download() and no revision, so it silently follows whatever the
+# repo's main branch points at today.
+#
+# Yawn owns these three values — it packages this model into a distributed DMG
+# and its build fails on a digest mismatch. This file is a consumer: on a
+# bump, change apps/yawn-app/worker/build_runtime.sh first and copy here.
+# Sharing the pin is what keeps one model on the machine rather than two that
+# drift apart with nothing to notice it.
+WHISPER_REPO = "mlx-community/whisper-large-v3-turbo"
+WHISPER_REVISION = "a4aaeec0636e6fef84abdcbe3544cb2bf7e9f6fb"
+WHISPER_DIGESTS = {
+    "config.json": "b34fc29e4e11e0a25e812775dd67f4dd16fc2c8eb43d28ae25ff7d660ecb6379",
+    "weights.safetensors": "951ed3fc1203e6a62467abb2144a96ce7eafca8fa77e3704fdb8635ff3e7f8a6",
+}
 
 CLEANUP_SYSTEM_PROMPT = (
     "You are a transcript cleaner. The user message contains dictated speech "
@@ -59,6 +76,55 @@ def offline_if_cached(repo_id):
     cache = Path.home() / ".cache/huggingface/hub" / ("models--" + repo_id.replace("/", "--"))
     if cache.exists():
         os.environ["HF_HUB_OFFLINE"] = "1"
+
+
+def digest_matches(path, expected):
+    """Whether path's contents hash to expected.
+
+    The hub stores large files under a blob name that is their sha256, so when
+    the snapshot symlink already points at a blob of that name the digest is
+    established by the download and nothing has to be read. That shortcut
+    proves the snapshot holds the file the hub served for this revision — the
+    failure it catches is a wrong or moved revision, not local tampering.
+    Everything else is hashed outright.
+    """
+    if os.path.basename(os.path.realpath(path)) == expected:
+        return True
+    digest = hashlib.sha256()
+    with open(path, "rb") as handle:
+        for chunk in iter(lambda: handle.read(1 << 20), b""):
+            digest.update(chunk)
+    return digest.hexdigest() == expected
+
+
+def whisper_model_path(repo):
+    """Resolve the Whisper repo id to a pinned local snapshot directory.
+
+    Returns the argument untouched for a local path or any repo other than the
+    default — `--whisper` stays an escape hatch, and pinning a revision of a
+    repo we know nothing about would be wrong.
+    """
+    if repo != WHISPER_REPO or Path(repo).exists():
+        offline_if_cached(repo)
+        return repo
+
+    snapshot = (Path.home() / ".cache/huggingface/hub"
+                / ("models--" + repo.replace("/", "--")) / "snapshots" / WHISPER_REVISION)
+    if not snapshot.is_dir():
+        from huggingface_hub import snapshot_download
+
+        log(f"fetching {repo} at {WHISPER_REVISION[:12]}")
+        snapshot = Path(snapshot_download(repo_id=repo, revision=WHISPER_REVISION))
+
+    os.environ.setdefault("HF_HUB_OFFLINE", "1")
+    for name, want in WHISPER_DIGESTS.items():
+        path = snapshot / name
+        if not path.exists():
+            sys.exit(f"whisper snapshot {WHISPER_REVISION[:12]} is missing {name}")
+        if not digest_matches(path, want):
+            sys.exit(f"whisper {name} does not match the pinned digest at {snapshot}")
+    log(f"whisper   {repo} @ {WHISPER_REVISION[:12]} (pinned, digests match)")
+    return str(snapshot)
 
 
 class Recorder:
@@ -148,14 +214,44 @@ def cleanup(text, model, timeout=30):
     return cleaned or text
 
 
-def frontmost_app():
+def focus_target():
+    """Bundle id and pid of the frontmost app, sampled when speaking starts.
+
+    Transcription and cleanup take ~1.5 s, which is long enough for focus to
+    drift — a notification, a click away. The pid is what lets insert_text put
+    the paste back where the words were aimed; the bundle id is what the
+    --on-capture event reports.
+    """
     try:
         from AppKit import NSWorkspace
 
         app = NSWorkspace.sharedWorkspace().frontmostApplication()
-        return app.bundleIdentifier() or app.localizedName()
+        if app is None:
+            return None, None
+        return (app.bundleIdentifier() or app.localizedName()), app.processIdentifier()
     except Exception:
-        return None
+        return None, None
+
+
+def restore_focus(pid, timeout=0.5):
+    """Bring pid back to the front. True once it is frontmost, False on timeout."""
+    try:
+        from AppKit import NSRunningApplication, NSWorkspace
+
+        app = NSRunningApplication.runningApplicationWithProcessIdentifier_(pid)
+        if app is None or app.isTerminated():
+            return False
+        app.activateWithOptions_(0)
+        workspace = NSWorkspace.sharedWorkspace()
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            current = workspace.frontmostApplication()
+            if current is not None and current.processIdentifier() == pid:
+                return True
+            time.sleep(0.02)
+        return False
+    except Exception:
+        return False
 
 
 def emit_capture(cmd, event):
@@ -202,9 +298,21 @@ def set_clipboard(data):
     subprocess.run(["pbcopy"], input=data)
 
 
-def insert_text(text):
-    """Paste via clipboard + synthetic Cmd+V, then restore the old clipboard."""
+def insert_text(text, pid=None):
+    """Paste via clipboard + synthetic Cmd+V, then restore the old clipboard.
+
+    If focus drifted while we were transcribing, put it back on the app that
+    was frontmost when speaking started — pasting into whatever happens to be
+    in front now is the failure this guards against. A drifted paste is
+    unrecoverable: the text is gone into someone else's text field.
+    """
     from pynput.keyboard import Controller, Key
+
+    if pid is not None:
+        current = focus_target()[1]
+        if current != pid and not restore_focus(pid):
+            log(f"focus moved to pid {current}, could not return to {pid} — not pasting")
+            return False
 
     saved = get_clipboard()
     set_clipboard(text.encode())
@@ -214,6 +322,7 @@ def insert_text(text):
         kb.tap("v")
     time.sleep(0.5)  # let the focused app read the clipboard before restoring
     set_clipboard(saved)
+    return True
 
 
 def resolve_key(name):
@@ -226,7 +335,7 @@ def resolve_key(name):
     sys.exit(f"unknown key {name!r} — use a pynput key name like alt_r, cmd_r, f13")
 
 
-def process(audio, voiced, args, app=None):
+def process(audio, voiced, args, target=(None, None)):
     if not voiced or len(audio) < SAMPLE_RATE // 2:
         log("no speech detected, discarding")
         play(SOUND_ERROR)
@@ -238,6 +347,8 @@ def process(audio, voiced, args, app=None):
         play(SOUND_ERROR)
         return
     log(f"raw       ({time.time() - t0:.1f}s): {raw}")
+
+    app, pid = target
 
     def capture_event(route, text):
         return {"ts": time.strftime("%Y-%m-%dT%H:%M:%S%z"), "route": route,
@@ -262,7 +373,9 @@ def process(audio, voiced, args, app=None):
     text = raw if args.no_cleanup else cleanup(raw, args.model)
     if text != raw:
         log(f"cleaned   ({time.time() - t0:.1f}s): {text}")
-    insert_text(text)
+    if not insert_text(text, pid):
+        play(SOUND_ERROR)
+        return  # no capture event — nothing was delivered
     log(f"inserted  ({time.time() - t0:.1f}s)")
     if args.on_capture:
         emit_capture(args.on_capture, capture_event("paste", text))
@@ -272,7 +385,8 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--key", default="alt_r", help="toggle key, pynput name (default: alt_r = right Option)")
     ap.add_argument("--model", default="llama3.1", help="Ollama model for cleanup (default: llama3.1)")
-    ap.add_argument("--whisper", default="mlx-community/whisper-large-v3-turbo", help="MLX whisper repo id")
+    ap.add_argument("--whisper", default=WHISPER_REPO,
+                    help="MLX whisper repo id (the default is revision-pinned; anything else is not)")
     ap.add_argument("--language", default="en", help="spoken language (default: en)")
     ap.add_argument("--no-cleanup", action="store_true", help="insert the raw transcript, skip Ollama")
     ap.add_argument("--no-auto-stop", action="store_true", help="disable trailing-silence auto-stop")
@@ -284,7 +398,7 @@ def main():
     ap.add_argument("--test-file", help="run transcribe+cleanup on a wav file and print (pipeline check, no mic/hotkey)")
     args = ap.parse_args()
 
-    offline_if_cached(args.whisper)
+    args.whisper = whisper_model_path(args.whisper)
 
     if args.test_file:
         raw = transcribe(args.test_file, args.whisper, args.language)
@@ -308,14 +422,14 @@ def main():
     log(f"ready — tap {args.key} to dictate, Ctrl-C to quit")
 
     recording = False
-    app = None
+    target = (None, None)
     try:
         while True:
             event = events.get()
             if not recording:
                 if event == "toggle":
                     # sample focus at the moment of speaking, not after processing
-                    app = frontmost_app() if args.on_capture else None
+                    target = focus_target()
                     recorder.start()
                     recording = True
                     play(SOUND_START)
@@ -325,7 +439,7 @@ def main():
                 play(SOUND_STOP)
                 audio, voiced = recorder.stop()
                 log(f"stopped ({event}, {len(audio) / SAMPLE_RATE:.1f}s)")
-                process(audio, voiced, args, app)
+                process(audio, voiced, args, target)
                 while not events.empty():  # drop toggles queued while processing
                     events.get_nowait()
     except KeyboardInterrupt:

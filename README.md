@@ -112,9 +112,12 @@ uv venv --python 3.13 .venv
 uv pip install --python .venv/bin/python mlx-whisper sounddevice pynput rumps
 ```
 
-ffmpeg via Homebrew. First use of a new `--whisper` model downloads weights
-from Hugging Face; after that the daemon sets `HF_HUB_OFFLINE=1` and runs
-fully offline.
+ffmpeg via Homebrew. The default Whisper model is pinned to one revision and
+its digests are checked at startup — the same snapshot Yawn packages, so the
+two tools share one copy on the machine instead of drifting onto different
+ones. First use downloads it from Hugging Face; after that the daemon sets
+`HF_HUB_OFFLINE=1` and runs fully offline. A non-default `--whisper` is not
+pinned.
 
 ## Notes
 
