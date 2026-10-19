@@ -1,6 +1,6 @@
 # AGENTS.md
 
-This file provides guidance to Codex (Codex.ai/code) when working with code in this repository.
+This file provides guidance to Claude Code (claude.ai/code) and Codex when working with code in this repository.
 
 ## What this is
 
@@ -49,7 +49,10 @@ callback posts `"auto_stop"` on trailing silence. The main loop starts/stops the
 the numpy array directly) → `match_note_phrase()` routing → `cleanup()` (Ollama
 `/api/chat`, falls back to the raw transcript if Ollama is down) → `insert_text()`
 (clipboard + synthetic ⌘V, clipboard saved/restored) or `add_note()` (osascript
-to Notes, background, no focus steal). `--on-capture` emits a JSON event per
+to Notes, background, no focus steal). `focus_target()` samples the frontmost
+bundle id and pid when speaking starts; `insert_text()` re-activates that pid
+before pasting and refuses the paste if it cannot, so a focus change during the
+~1.5 s pipeline cannot land the text in another app. `--on-capture` emits a JSON event per
 delivery on a fire-and-forget thread.
 
 `menubar.py` never owns the daemon process — it drives the launchd job via
@@ -76,13 +79,16 @@ launchd agents (`com.local-dictation.daemon.plist` / `com.local-dictation.menuba
   daemon sets `HF_HUB_OFFLINE=1` once the Whisper model is cached. Don't add
   network calls beyond Ollama's `localhost:11434`.
 - Whisper model: `mlx-community/whisper-large-v3-turbo` (~1.6 GB, cached in
-  `~/.cache/huggingface`). Ollama cleanup model: `llama3.1`, loaded on the
+  `~/.cache/huggingface`), **pinned** by `WHISPER_REVISION` + `WHISPER_DIGESTS`
+  and verified at startup. Yawn owns those values
+  (`apps/yawn-app/worker/build_runtime.sh`); bump there first, copy here. A
+  non-default `--whisper` is passed through unpinned on purpose. Ollama cleanup model: `llama3.1`, loaded on the
   first cleanup and released after five idle minutes via `keep_alive: 5m`.
 
 ## Documentation
 
 `docs/architecture/README.md` holds the structural view (pipeline, threading,
 deployment diagrams); PLAN.md holds decisions and rationale; README.md is the
-user doc. Documentation skills from the Codex Docs Toolkit are installed in
-`.Codex/commands/` (`/doc-architecture`, `/doc-audit`, etc.) — apply them
+user doc. Documentation skills from the Claude Docs Toolkit are installed in
+`.claude/commands/` (`/doc-architecture`, `/doc-audit`, etc.) — apply them
 adaptively; a repo this size does not need the full docs/ tree.
