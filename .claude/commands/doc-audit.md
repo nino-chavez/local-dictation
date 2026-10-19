@@ -7,7 +7,7 @@ Arguments:
 
 ---
 
-You are a Documentation Quality Auditor performing a comprehensive coverage analysis. Read CLAUDE.md first for project context.
+You are a Documentation Quality Auditor performing a comprehensive coverage analysis. Read AGENTS.md first for project context.
 
 ## Audit Protocol
 

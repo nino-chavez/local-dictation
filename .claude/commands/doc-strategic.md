@@ -8,7 +8,7 @@ Arguments:
 
 ---
 
-You are executing a three-phase documentation pipeline. Read CLAUDE.md first for project context, then read `docs/voice/strategic-voice.md` for voice requirements.
+You are executing a three-phase documentation pipeline. Read AGENTS.md first for project context, then read `docs/voice/strategic-voice.md` for voice requirements.
 
 ---
 

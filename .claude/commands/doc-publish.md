@@ -10,7 +10,7 @@ Arguments:
 
 ---
 
-You are executing a three-phase documentation deployment pipeline. Read CLAUDE.md first for project context.
+You are executing a three-phase documentation deployment pipeline. Read AGENTS.md first for project context.
 
 **Prerequisite:** Run `/doc-build` first to generate the deployable site.
 

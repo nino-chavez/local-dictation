@@ -7,7 +7,7 @@ Arguments:
 
 ---
 
-You are executing a three-phase documentation pipeline. Read CLAUDE.md first for project context, then read `docs/voice/architecture-voice.md` for voice requirements.
+You are executing a three-phase documentation pipeline. Read AGENTS.md first for project context, then read `docs/voice/architecture-voice.md` for voice requirements.
 
 ---
 
@@ -101,7 +101,7 @@ Review the draft against these criteria:
 
 ### Consistency Pass
 
-- [ ] Terminology matches CLAUDE.md definitions
+- [ ] Terminology matches AGENTS.md definitions
 - [ ] Diagram labels match prose descriptions
 - [ ] Table columns are uniformly populated
 - [ ] Links to related docs are valid paths

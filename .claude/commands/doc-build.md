@@ -11,7 +11,7 @@ Arguments:
 
 ---
 
-You are executing a three-phase documentation build pipeline. Read CLAUDE.md first for project context.
+You are executing a three-phase documentation build pipeline. Read AGENTS.md first for project context.
 
 ---
 
@@ -106,8 +106,8 @@ Use template from `templates/jekyll/_config.yml.template` with substitutions:
 
 | Placeholder | Source |
 |-------------|--------|
-| `{{SITE_TITLE}}` | Project name from CLAUDE.md or branding.json |
-| `{{SITE_DESCRIPTION}}` | Project description from CLAUDE.md |
+| `{{SITE_TITLE}}` | Project name from AGENTS.md or branding.json |
+| `{{SITE_DESCRIPTION}}` | Project description from AGENTS.md |
 | `{{BASE_URL}}` | $base_url argument |
 | `{{REPO_URL}}` | Git remote URL if available |
 | `{{PRIMARY_COLOR}}` | From branding.json or default `#7253ed` |
@@ -191,7 +191,7 @@ permalink: /
 
 # [Project Name] Documentation
 
-[Project description from CLAUDE.md]
+[Project description from AGENTS.md]
 
 ## Documentation Sections
 
