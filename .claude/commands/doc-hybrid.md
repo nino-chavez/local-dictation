@@ -10,7 +10,7 @@ Arguments:
 
 ---
 
-You are executing a specialized documentation pipeline for hybrid documents. Read CLAUDE.md first, then read voice guides for BOTH specified layers:
+You are executing a specialized documentation pipeline for hybrid documents. Read AGENTS.md first, then read voice guides for BOTH specified layers:
 - `docs/voice/[primary]-voice.md`
 - `docs/voice/[secondary]-voice.md`
 
